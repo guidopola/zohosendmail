@@ -78,7 +78,7 @@ func New(zohoAuthToken string) (*ZohoMailSender, error) {
 }
 
 func (m *ZohoMailSender) zohoGetAccountInfo() error {
-	req, err := http.NewRequest("GET", "https://mail.zoho.com/api/accounts", nil)
+	req, _ := http.NewRequest("GET", "https://mail.zoho.com/api/accounts", nil)
 	req.Header.Set("Authorization", "Zoho-authtoken "+m.ZohoAuthToken)
 
 	client := &http.Client{Timeout: time.Second * 10}
