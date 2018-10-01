@@ -1,3 +1,4 @@
+[![GoDoc](https://godoc.org/github.com/guidopola/zohosendmail?status.svg)](https://godoc.org/github.com/guidopola/zohosendmail)
 # A Go library to send mails with Zoho.net
 
 
