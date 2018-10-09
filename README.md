@@ -20,8 +20,30 @@ zm, err := zohosendmail.New(ZohoAuthToken)
 ##### Send an email
 
 ```go
-err := zm.SendMail("test.dest@mail.com", "Test subject", "This is a test email body!")
+err := zm.SendMail("test.dest@mail.com", "Test subject", "This is a test email body!", nil)
 ```
+
+##### To add an attachment.
+
+```go
+// Read the file contents
+content, err := ioutil.ReadFile("./example.zip")
+
+// Upload the attachment to zoho.
+attachment, err := zm.UploadAttachment("example.zip", content)
+
+// Send the email.
+err := zm.SendMail("test.dest@mail.com", "Test subject", "This is a test email body!", &zohosendmail.MailAttachmentSlice{attachment})
+```
+
+##### To add multiple attachments.
+
+```go
+err := zm.SendMail("test.dest@mail.com", "Test subject", "This is a test email body!", &zohosendmail.MailAttachmentSlice{attachment, attachment, attachment})
+```
+
+#####
+
 
 
 License

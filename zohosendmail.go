@@ -19,11 +19,22 @@ var (
 	ErrMapEntryNotFound = errors.New("Zoho response data not found!")
 )
 
-type zohoEmail struct {
-	FromAddress string `json:"fromAddress"`
-	ToAddress   string `json:"toAddress"`
-	Subject     string `json:"subject"`
-	Content     string `json:"content"`
+// https://mail.zoho.com/api/accounts/<accountId>/messages
+type zohoAPIEmail struct {
+	FromAddress string               `json:"fromAddress"`
+	ToAddress   string               `json:"toAddress"`
+	Subject     string               `json:"subject"`
+	Content     string               `json:"content"`
+	Attachments []ZohoMailAttachment `json:"attachments,omitempty"`
+}
+
+// https://mail.zoho.com/api/accounts/<accountId>/messages/attachments
+type zohoAPIAttachmentUpload struct {
+	Status struct {
+		Code        int    `json:"code"`
+		Description string `json:"description"`
+	} `json:"status"`
+	Data ZohoMailAttachment `json:"data"`
 }
 
 // The main object struct.
@@ -46,6 +57,27 @@ type ZohoMailSender struct {
 	// Fetched directly from the api
 	ZohoMailAddress string
 }
+
+// ZohoMailAttachment
+// Contains data for an attachment file.
+// To get the data use zohosendmail.UploadAttachment(s) once
+// to upload the data to zoho.net.
+// NOTE: You don't need to upload the attachment every time you send an email.
+//	just save this struct data and use it when needed.
+//
+type ZohoMailAttachment struct {
+	// Name of the Store where the attachment is saved
+	StoreName string `json:"storeName"`
+
+	// Path in which the attachment is stored
+	Path string `json:"attachmentPath"`
+
+	//  Name of the attachment
+	Name string `json:"attachmentName"`
+}
+
+//
+type MailAttachmentSlice []ZohoMailAttachment
 
 // Creates a new ZohoMailSender object
 func New(zohoAuthToken string) (*ZohoMailSender, error) {
@@ -111,16 +143,58 @@ func (m *ZohoMailSender) zohoGetAccountInfo() error {
 	return nil
 }
 
+// return ZohoMailAttachment
+// https://mail.zoho.com/api/accounts/<accountId>/messages/attachments
+func (m *ZohoMailSender) UploadAttachment(fileName string, fileContent []byte) (ZohoMailAttachment, error) {
+	req, _ := http.NewRequest("POST", "https://mail.zoho.com/api/accounts/"+m.ZohoAccountId+"/messages/attachments?fileName="+fileName,
+		bytes.NewBuffer(fileContent))
+	req.Header.Set("Authorization", "Zoho-authtoken "+m.ZohoAuthToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return ZohoMailAttachment{}, err
+	}
+
+	if resp.StatusCode != 200 {
+		return ZohoMailAttachment{}, fmt.Errorf("Response code is %v", resp.StatusCode)
+	}
+
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	//
+	var response zohoAPIAttachmentUpload
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return ZohoMailAttachment{}, err
+	}
+
+	if response.Status.Code != 200 {
+		return ZohoMailAttachment{}, fmt.Errorf("Response code is %v", resp.StatusCode)
+	}
+	return response.Data, nil
+}
+
 // Send an email using the zoho api
 // https://www.zoho.com/mail/help/api/post-send-an-email.html
-func (m *ZohoMailSender) SendMail(to, subject, content string) error {
+func (m *ZohoMailSender) SendMail(to, subject, content string, attachments *MailAttachmentSlice) error {
+
+	//
+	if attachments == nil {
+		attachments = &MailAttachmentSlice{}
+	}
+
 	// Build the request json object
-	apiRequest, _ := json.Marshal(zohoEmail{
-		m.ZohoMailAddress,
-		to,
-		subject,
-		content,
+	apiRequest, _ := json.Marshal(zohoAPIEmail{
+		FromAddress: m.ZohoMailAddress,
+		ToAddress:   to,
+		Subject:     subject,
+		Content:     content,
+		Attachments: *attachments,
 	})
+
 	req, _ := http.NewRequest("POST", "https://mail.zoho.com/api/accounts/"+m.ZohoAccountId+"/messages", bytes.NewBuffer(apiRequest))
 	req.Header.Set("Authorization", "Zoho-authtoken "+m.ZohoAuthToken)
 	req.Header.Set("Content-Type", "application/json")
